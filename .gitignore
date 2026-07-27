@@ -1,0 +1,30 @@
+# Segredos — nunca commitar
+.env
+.env.local
+
+# Dados pessoais. O master_profile.yaml tem telefone, e-mail e endereço;
+# num repositório público isso vira dado exposto. Só o .example é versionado.
+# Se o SEU repositório for privado e você quiser o perfil versionado como
+# backup, apague a linha abaixo.
+data/master_profile.yaml
+
+# Banco local e logs
+*.db
+logs/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Documentos gerados
+documents/out/
+output/
+
+# Sistema operacional / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,118 @@
+# ============================================================================
+# master_profile.example.yaml
+#
+# Modelo em branco. Copie este arquivo para data/master_profile.yaml e
+# preencha com os SEUS dados reais. Este é o único lugar de onde o CV, a
+# cover letter e o scoring da IA tiram fatos sobre você: o LLM só seleciona
+# e reordena o que estiver aqui, nunca inventa nada fora deste arquivo.
+#
+# Todo texto que aparece em documentos para o candidato (resumo, bullets de
+# experiência, etc.) é bilíngue: preencha "pt" e "en" mesmo que sejam
+# parecidos, porque o gerador escolhe o idioma pela vaga.
+# ============================================================================
+
+name: "Seu Nome Completo"
+
+contact:
+  location:
+    pt: "Sua Cidade, UF, Brasil"
+    en: "Your City, State, Brazil"
+  phone: "+55 00 00000-0000"
+  email: "seu.email@exemplo.com"
+  linkedin: "https://linkedin.com/in/seu-usuario"
+  github: "https://github.com/seu-usuario"
+  website: "https://seusite.dev"          # opcional; apague a linha se não tiver
+
+# Títulos de cada seção do CV, também bilíngues. Vão em CAIXA ALTA porque é
+# assim que aparecem no DOCX. Pode deixar exatamente como está: é só cabeçalho,
+# não conteúdo pessoal.
+headings:
+  summary: { pt: "PERFIL PROFISSIONAL", en: "PROFESSIONAL SUMMARY" }
+  skills: { pt: "HABILIDADES TÉCNICAS", en: "TECHNICAL SKILLS" }
+  experience: { pt: "EXPERIÊNCIA PROFISSIONAL", en: "PROFESSIONAL EXPERIENCE" }
+  projects: { pt: "PROJETOS", en: "PROJECTS" }
+  education: { pt: "FORMAÇÃO ACADÊMICA", en: "EDUCATION" }
+  certifications: { pt: "CERTIFICAÇÕES", en: "CERTIFICATIONS" }
+  languages: { pt: "IDIOMAS", en: "LANGUAGES" }
+
+summary:
+  pt: >
+    Duas ou três frases sobre quem você é profissionalmente, sua stack
+    principal e o tipo de vaga que você busca.
+  en: >
+    Two or three sentences about who you are professionally, your main
+    stack, and the kind of role you're targeting.
+
+# Agrupe suas habilidades como quiser; os nomes dos grupos (Backend,
+# Frontend, etc.) são livres, mas precisam bater com as chaves em
+# skill_group_labels logo abaixo.
+skills:
+  Backend:
+    - "Java"
+    - "Spring Boot"
+  Frontend:
+    - "Angular"
+    - "TypeScript"
+  Databases:
+    - "PostgreSQL"
+  DevOps:
+    - "Docker"
+  Other:
+    - "Python"
+
+skill_group_labels:
+  Backend: { pt: "Backend", en: "Backend" }
+  Frontend: { pt: "Frontend", en: "Frontend" }
+  Databases: { pt: "Bancos de Dados", en: "Databases" }
+  DevOps: { pt: "DevOps", en: "DevOps" }
+  Other: { pt: "Outros", en: "Other" }
+
+# Uma entrada por experiência profissional, da mais recente para a mais
+# antiga. "id" é só um identificador interno, use algo curto e único.
+experience:
+  - id: "exp1"
+    company: "Nome da Empresa"
+    role:
+      pt: "Seu Cargo"
+      en: "Your Role"
+    org_note:
+      pt: ""     # ex.: "ERP legado em PowerBuilder"; deixe vazio se não precisar
+      en: ""
+    period:
+      pt: "jan 2024 - atual"
+      en: "Jan 2024 - present"
+    location:
+      pt: "Cidade, UF"
+      en: "City, State"
+    bullets:
+      - id: "exp1-b1"
+        pt: "O que você fez e o resultado, em uma frase."
+        en: "What you did and the result, in one sentence."
+
+# Projetos pessoais/portfólio que valem a pena aparecer no CV.
+projects:
+  - id: "proj1"
+    name: "Nome do Projeto"
+    stack: ["Python", "PostgreSQL"]
+    bullets:
+      - id: "proj1-b1"
+        pt: "O que o projeto faz e por que ele importa para a vaga."
+        en: "What the project does and why it matters for the role."
+
+education:
+  - degree:
+      pt: "Nome do Curso"
+      en: "Degree Name"
+    school:
+      pt: "Nome da Instituição"
+      en: "Institution Name"
+    period: "2022 - 2026 (previsto)"
+
+# Lista simples, uma entrada por certificação.
+certifications:
+  - pt: "Nome da certificação"
+    en: "Certification name"
+
+languages:
+  pt: "Português (nativo), Inglês (nível X)"
+  en: "Portuguese (native), English (level X)"
