@@ -33,7 +33,7 @@ from utils import detect_language
 from generate import resolve_job, raw_from_job, Ambiguous
 from generators.cover_letter import generate_cover_letter
 from generators.tailored_cv import tailor_cv
-from notifiers.telegram import send_job_documents
+from notifiers.telegram import send_job_documents, send_default_cv
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 log = logging.getLogger("bot")
@@ -51,6 +51,8 @@ HELP_TEXT = (
     "`/cover <id>` — gera e envia a cover letter \\(`/resume` é atalho\\)\\.\n"
     "`/docs <id>` — gera e envia os dois\\.\n"
     "Acrescente `en` ou `pt` para forçar o idioma \\(ex\\.: `/cv a1b2c3d4 en`\\)\\.\n\n"
+    "`/cvpadrao` — envia o CV padrão direto do perfil, sem adaptar para "
+    "nenhuma vaga \\(`en`/`pt` para o idioma, ex\\.: `/cvpadrao en`\\)\\.\n\n"
     "`/lista` — mostra as vagas candidatas com seus ids\\."
 )
 
@@ -269,6 +271,24 @@ async def cmd_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _generate_and_send(update, want_cover=True, want_cv=True)
 
 
+def _parse_lang_arg(text: str, default: str = "pt") -> str:
+    """Parse '/cvpadrao [pt|en]' → lang, defaulting to `default` when absent/unknown."""
+    parts = (text or "").split()
+    if len(parts) > 1 and parts[1].lower() in ("pt", "en"):
+        return parts[1].lower()
+    return default
+
+
+async def cmd_cv_padrao(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _authorized(update):
+        return
+    lang = _parse_lang_arg(update.message.text)
+    await update.message.reply_text(f"⏳ Gerando o CV padrão ({lang})...")
+    ok = await send_default_cv(lang)
+    await update.message.reply_text(
+        "✅ Enviado!" if ok else "⚠️ Falha ao enviar o CV padrão.")
+
+
 async def cmd_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _authorized(update):
         return
@@ -305,6 +325,7 @@ def register_handlers(app: Application) -> Application:
     app.add_handler(CommandHandler("cv", cmd_cv))
     app.add_handler(CommandHandler(["cover", "resume", "carta"], cmd_cover))
     app.add_handler(CommandHandler("docs", cmd_docs))
+    app.add_handler(CommandHandler(["cvpadrao", "padrao"], cmd_cv_padrao))
     app.add_handler(CommandHandler(["lista", "list"], cmd_lista))
     app.add_handler(CommandHandler(["ajuda", "help", "start"], cmd_ajuda))
     return app

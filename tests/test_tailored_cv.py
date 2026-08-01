@@ -60,3 +60,24 @@ def test_summary_falls_back_when_missing():
     profile = load_profile()
     resolved = _validate_and_resolve({}, profile, "pt")
     assert resolved["summary"] == profile["summary"]["pt"]
+
+
+def test_extracurricular_experience_kept_separate_from_work_history(a_real_extracurricular_experience):
+    profile = load_profile()
+    resolved = _validate_and_resolve({}, profile, "en")
+    prof_headers = " ".join(e["header"] for e in resolved["experience"])
+    assert a_real_extracurricular_experience["company"] not in prof_headers
+    extra_headers = " ".join(e["header"] for e in resolved["extracurricular_experience"])
+    assert a_real_extracurricular_experience["company"] in extra_headers
+
+
+def test_role_tag_falls_back_to_profile_when_plan_omits_it():
+    profile = load_profile()
+    resolved = _validate_and_resolve({}, profile, "en")
+    assert resolved["role_tag"] == profile["role_tag"]["en"]
+
+
+def test_role_tag_uses_plan_value_when_provided():
+    profile = load_profile()
+    resolved = _validate_and_resolve({"role_tag": "Custom Title"}, profile, "en")
+    assert resolved["role_tag"] == "Custom Title"

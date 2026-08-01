@@ -3,7 +3,7 @@
 Pipeline automatizado de busca de vagas. Ele varre vários job boards de tempos
 em tempos, pontua cada vaga contra o seu perfil usando uma LLM, e manda as que
 passam do corte para o seu Telegram. Para as vagas boas, você gera CV adaptado
-e cover letter em DOCX com um comando no próprio chat.
+e cover letter em PDF com um comando no próprio chat.
 
 Cada pessoa roda a própria instância: seu bot, seu perfil, seu banco de dados,
 na sua máquina. Não existe servidor central nem conta compartilhada.
@@ -265,7 +265,7 @@ O idioma é detectado pela vaga. Para forçar, acrescente `pt` ou `en`:
 /cv a1b2c3d4 en
 ```
 
-Os arquivos chegam como DOCX no próprio chat. `/carta` e `/resume` são atalhos
+Os arquivos chegam como PDF no próprio chat. `/carta` e `/resume` são atalhos
 para `/cover`.
 
 ### Todos os comandos
@@ -275,9 +275,10 @@ para `/cover`.
 | `/ajuda` | lista os comandos |
 | `/vaga <url>` | adiciona uma vaga manualmente |
 | `/lista` | mostra as vagas salvas com seus ids |
-| `/cv <id> [pt\|en]` | gera e envia o CV adaptado |
+| `/cv <id> [pt\|en]` | gera e envia o CV adaptado para a vaga |
 | `/cover <id> [pt\|en]` | gera e envia a cover letter |
 | `/docs <id> [pt\|en]` | gera e envia os dois |
+| `/cvpadrao [pt\|en]` | envia o CV padrão direto do perfil, sem adaptar para nenhuma vaga |
 
 Pelo terminal, `python generate.py <id> [--cv] [--cover] [--lang pt|en]` faz o
 mesmo, para quem preferir.
@@ -294,7 +295,7 @@ pytest
 A suíte roda inteiramente offline: nenhuma chamada de rede, nenhuma chamada
 real de LLM, nenhuma chave necessária. Ela cobre o casamento de palavras-chave
 por limite de palavra, os filtros de senioridade e de trilha, a invariante de
-"nada inventado" do gerador de CV, a renderização do DOCX e os helpers de
+"nada inventado" do gerador de CV, a renderização do PDF e os helpers de
 formatação do Telegram.
 
 ---
@@ -355,9 +356,11 @@ antes de commitar.
 descarta qualquer coisa que não esteja lá. O modelo não consegue inventar
 experiência nem que tente.
 
-**Saída amigável a ATS.** Os CVs saem em DOCX de coluna única, com títulos
+**Saída amigável a ATS.** Os CVs saem em PDF de coluna única, com títulos
 padrão e sem tabelas, caixas de texto ou colunas, que costumam quebrar os
-parsers de ATS.
+parsers de ATS. O CV é renderizado para caber em uma única página: se o
+conteúdo não couber no tamanho de fonte/margens padrão, o renderizador
+reduz fonte e espaçamento e corta bullets de menor prioridade até caber.
 
 **Casamento por limite de palavra.** As palavras-chave usam regex ancorada em
 `\b`, então `Java` nunca casa com `JavaScript` e `Spring Boot` casa como uma
@@ -396,4 +399,4 @@ Preencha o `SourceConfig` e mova para `ENABLED_SOURCES`.
 ## 12. Stack
 
 Python · asyncio · aiohttp · BeautifulSoup · SQLAlchemy · Pydantic · Groq ·
-python-telegram-bot · python-docx · APScheduler
+python-telegram-bot · reportlab · pypdf · APScheduler

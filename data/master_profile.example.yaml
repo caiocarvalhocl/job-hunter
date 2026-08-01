@@ -13,6 +13,11 @@
 
 name: "Seu Nome Completo"
 
+# Cargo curto, mostrado embaixo do nome (cargo atual ou o que você busca).
+role_tag:
+  pt: "Seu Cargo"
+  en: "Your Role"
+
 contact:
   location:
     pt: "Sua Cidade, UF, Brasil"
@@ -76,7 +81,7 @@ experience:
       pt: "Seu Cargo"
       en: "Your Role"
     org_note:
-      pt: ""     # ex.: "ERP legado em PowerBuilder"; deixe vazio se não precisar
+      pt: ""     # ex.: "Sistema de gestão para o varejo"; deixe vazio se não precisar
       en: ""
     period:
       pt: "jan 2024 - atual"

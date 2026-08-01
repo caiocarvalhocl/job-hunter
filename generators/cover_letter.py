@@ -33,8 +33,9 @@ Write a cover letter that:
 3. Highlights 2-3 concrete achievements/projects
 4. Shows genuine interest in the company/role
 5. Closes with a clear call to action
-6. Is between 250-350 words
+6. Is between 250-350 words, concise and free of filler/verbose sentences
 7. Does NOT use clichés like "team player", "hard worker", "passionate"
+8. Never mentions "PowerBuilder", even if related facts appear in the profile
 
 Return ONLY the cover letter text, no subject line, no date, no address headers.
 """

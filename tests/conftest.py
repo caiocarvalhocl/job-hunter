@@ -48,6 +48,13 @@ def a_real_experience(profile):
 
 
 @pytest.fixture
+def a_real_extracurricular_experience(profile):
+    if not profile.get("extracurricular_experience"):
+        pytest.skip("perfil sem experiência extracurricular cadastrada")
+    return profile["extracurricular_experience"][0]
+
+
+@pytest.fixture
 def db_session():
     """Fresh in-memory schema per test."""
     from db.models import Base, engine, SessionLocal

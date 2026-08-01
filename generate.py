@@ -6,7 +6,7 @@ Usage:
     python generate.py <job> --cover         # cover letter only
     python generate.py <job> --cv            # tailored CV only
     python generate.py <job> --lang en       # force language (default: auto)
-    python generate.py <job> --no-telegram   # save DOCX locally, don't send
+    python generate.py <job> --no-telegram   # save PDF locally, don't send
     python generate.py --list [N]            # list recent candidate jobs
 
 <job> can be:
@@ -26,8 +26,8 @@ from db.models import init_db, SessionLocal, Job
 from scrapers.base import RawJob
 from generators.cover_letter import generate_cover_letter
 from generators.tailored_cv import tailor_cv
-from documents.renderer import text_to_docx, cv_to_docx
-from notifiers.telegram import send_job_documents, _slug
+from documents.renderer import text_to_pdf, cv_to_pdf
+from notifiers.telegram import send_job_documents, _slug, _candidate_slug
 
 OUTPUT_DIR = Path("output")
 
@@ -76,7 +76,7 @@ def raw_from_job(job: Job) -> RawJob:
     )
 
 
-def _save_docx(doc, path: Path):
+def _save_pdf(doc, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     data = doc.getvalue() if hasattr(doc, "getvalue") else doc.read()
     path.write_bytes(data)
@@ -121,14 +121,15 @@ async def generate(job: Job, db: Session, want_cover: bool, want_cv: bool,
     db.commit()
 
     slug = _slug(job.company)
+    name = _candidate_slug()
     saved = []
     if job.cover_letter and want_cover:
-        doc = text_to_docx(f"Cover Letter — {job.title}", job.cover_letter,
-                           filename=f"cover_letter_{slug}.docx")
-        saved.append(_save_docx(doc, OUTPUT_DIR / f"cover_letter_{slug}_{job.id[:8]}.docx"))
+        doc = text_to_pdf(f"Cover Letter — {job.title}", job.cover_letter,
+                          filename=f"{name}_cover_letter_{slug}.pdf")
+        saved.append(_save_pdf(doc, OUTPUT_DIR / f"{name}_cover_letter_{slug}_{job.id[:8]}.pdf"))
     if job.tailored_cv and want_cv:
-        doc = cv_to_docx(json.loads(job.tailored_cv), filename=f"cv_{slug}.docx")
-        saved.append(_save_docx(doc, OUTPUT_DIR / f"cv_{slug}_{job.id[:8]}.docx"))
+        doc = cv_to_pdf(json.loads(job.tailored_cv), filename=f"{name}_cv_{slug}.pdf")
+        saved.append(_save_pdf(doc, OUTPUT_DIR / f"{name}_cv_{slug}_{job.id[:8]}.pdf"))
 
     for path in saved:
         print(f"💾 {path}")

@@ -56,6 +56,9 @@ responsibility that is not present in the provided data.
 ## CURRENT SUMMARY (rewrite this, same facts, mirror the job's language and priorities)
 {profile['summary'][lang]}
 
+## CURRENT ROLE TAG (short title shown under the name, e.g. "Backend Developer")
+{profile.get('role_tag', {}).get(lang, '')}
+
 ## JOB POSTING
 Title: {job.title}
 Company: {job.company}
@@ -66,7 +69,8 @@ Description:
 ## YOUR TASK
 Return ONLY a JSON object (no markdown fences, no commentary) written in {lang_name}:
 {{
-  "summary": "<rewritten summary, 3-4 sentences, {lang_name}, ONLY facts already present above>",
+  "summary": "<rewritten summary, 2-3 concise sentences (no filler, no repeated info), {lang_name}, ONLY facts already present above>",
+  "role_tag": "<short role title (2-5 words), {lang_name}, e.g. 'Backend Developer' or 'Full Stack Developer' — pick whichever framing fits this job best, but it must be honestly supported by the skills/experience above>",
   "skill_order": ["<skills copied EXACTLY from all_skills, most relevant first, drop the least relevant>"],
   "experience": [
     {{"company": "<exact company name>", "bullet_ids": ["<ids to keep, most relevant first>"]}}
@@ -79,6 +83,13 @@ Rules:
 - Keep every real job in experience (do not drop a whole company), but you may
   drop or reorder individual bullets.
 - If unsure whether a skill is relevant, keep it rather than invent a new one.
+- Never mention "PowerBuilder" anywhere in the summary, even if related facts
+  appear in the source data.
+- The role tag is a framing choice, not a new fact: don't call yourself
+  something the skills/experience above don't support (e.g. no "Data
+  Scientist" without ML experience in the data).
+- The CV must fit on a single page: keep the summary short and prefer fewer,
+  higher-impact bullets over including everything.
 """
 
 
@@ -134,6 +145,19 @@ def _validate_and_resolve(plan: dict, profile: dict, lang: str) -> dict:
         meta = " | ".join(x for x in [e["period"][lang], e["location"][lang]] if x)
         experience.append({"header": header, "meta": meta, "bullets": [bullets_by_id[i] for i in wanted]})
 
+    # Extracurricular experience, shown in its own section, separate from
+    # Work History. Not subject to LLM tailoring — same as education/
+    # certifications, it's always shown in full.
+    extracurricular_experience = []
+    for e in profile.get("extracurricular_experience", []):
+        org = e["org_note"][lang]
+        header = f"{e['role'][lang]} | {e['company']}" + (f" - {org}" if org else "")
+        meta = " | ".join(x for x in [e["period"][lang], e["location"][lang]] if x)
+        extracurricular_experience.append({
+            "header": header, "meta": meta,
+            "bullets": [b[lang] for b in e["bullets"]],
+        })
+
     # Projects
     valid_project_ids = {p["id"]: p for p in profile["projects"]}
     chosen_pids = [pid for pid in plan.get("project_ids", []) if pid in valid_project_ids]
@@ -148,14 +172,19 @@ def _validate_and_resolve(plan: dict, profile: dict, lang: str) -> dict:
         })
 
     c = profile["contact"]
-    contact_lines = [
-        f"{c['location'][lang]} | {c['phone']} | {c['email']}",
-        f"{c['linkedin']} | {c['github']} | {c['website']}",
-    ]
+    contact = {
+        "location": c["location"][lang],
+        "phone": c["phone"],
+        "email": c["email"],
+        "linkedin": c["linkedin"],
+        "github": c["github"],
+        "website": c.get("website") or "",
+    }
 
     return {
         "name": profile["name"],
-        "contact_lines": contact_lines,
+        "role_tag": plan.get("role_tag") or profile.get("role_tag", {}).get(lang, ""),
+        "contact": contact,
         "headings": {k: v[lang] for k, v in profile["headings"].items()},
         "summary": plan.get("summary") or profile["summary"][lang],
         "skills": grouped,
@@ -165,6 +194,7 @@ def _validate_and_resolve(plan: dict, profile: dict, lang: str) -> dict:
             (f"{ed['degree'][lang]}", f"{ed['school'][lang]} | {ed['period']}")
             for ed in profile["education"]
         ],
+        "extracurricular_experience": extracurricular_experience,
         "certifications": [cert[lang] for cert in profile["certifications"]],
         "languages_label": profile["headings"]["languages"][lang],
         "languages": profile["languages"][lang],

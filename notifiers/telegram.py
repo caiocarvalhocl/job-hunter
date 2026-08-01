@@ -5,13 +5,19 @@ import json
 import re
 from db.models import Job
 from config.settings import get_settings
-from documents.renderer import text_to_docx, cv_to_docx
+from documents.renderer import text_to_pdf, cv_to_pdf
+from generators.tailored_cv import _validate_and_resolve
+from profile import load_profile
 
 settings = get_settings()
 
 
 def _slug(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "_", (text or "vaga")).strip("_") or "vaga"
+
+
+def _candidate_slug() -> str:
+    return _slug(load_profile()["name"]).lower()
 
 
 def _escape(text: str) -> str:
@@ -70,13 +76,14 @@ async def send_job_documents(job: Job) -> bool:
     """Send whichever documents the job currently has (cover letter, CV)."""
     bot = Bot(token=settings.telegram_bot_token)
     slug = _slug(job.company)
+    name = _candidate_slug()
 
     try:
         if job.cover_letter:
             preview = job.cover_letter[:280].rsplit(" ", 1)[0] + "..."
-            doc = text_to_docx(
+            doc = text_to_pdf(
                 f"Cover Letter — {job.title}", job.cover_letter,
-                filename=f"cover_letter_{slug}.docx",
+                filename=f"{name}_cover_letter_{slug}.pdf",
             )
             await bot.send_document(
                 chat_id=settings.telegram_chat_id,
@@ -87,7 +94,7 @@ async def send_job_documents(job: Job) -> bool:
 
         if job.tailored_cv:
             cv_data = json.loads(job.tailored_cv)
-            cv_doc = cv_to_docx(cv_data, filename=f"cv_{slug}.docx")
+            cv_doc = cv_to_pdf(cv_data, filename=f"{name}_cv_{slug}.pdf")
             await bot.send_document(
                 chat_id=settings.telegram_chat_id,
                 document=cv_doc,
@@ -99,6 +106,27 @@ async def send_job_documents(job: Job) -> bool:
 
     except TelegramError as e:
         print(f"[TELEGRAM] Error sending documents: {e}")
+        return False
+
+
+async def send_default_cv(lang: str = "pt") -> bool:
+    """Send the CV straight from the master profile, untailored (no job, no LLM)."""
+    bot = Bot(token=settings.telegram_bot_token)
+    profile = load_profile()
+    cv_data = _validate_and_resolve({}, profile, lang)
+    name = _candidate_slug()
+    cv_doc = cv_to_pdf(cv_data, filename=f"{name}_cv_padrao.pdf")
+
+    try:
+        await bot.send_document(
+            chat_id=settings.telegram_chat_id,
+            document=cv_doc,
+            filename=cv_doc.name,
+            caption="🎯 CV padrão (sem adaptação para vaga específica)",
+        )
+        return True
+    except TelegramError as e:
+        print(f"[TELEGRAM] Error sending default CV: {e}")
         return False
 
 

@@ -47,3 +47,23 @@ def test_parse_gen_args_ignores_unknown_lang():
 def test_parse_gen_args_empty():
     assert _parse_gen_args("/cv") == ("", "auto")
     assert _parse_gen_args("") == ("", "auto")
+
+
+from bot import _parse_lang_arg
+
+
+def test_parse_lang_arg_defaults_to_pt():
+    assert _parse_lang_arg("/cvpadrao") == "pt"
+    assert _parse_lang_arg("") == "pt"
+
+
+def test_parse_lang_arg_accepts_en():
+    assert _parse_lang_arg("/cvpadrao en") == "en"
+
+
+def test_parse_lang_arg_ignores_unknown_lang():
+    assert _parse_lang_arg("/cvpadrao fr") == "pt"
+
+
+def test_parse_lang_arg_custom_default():
+    assert _parse_lang_arg("/cvpadrao", default="en") == "en"
