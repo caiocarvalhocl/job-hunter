@@ -1,0 +1,12 @@
+services:
+  job-hunter:
+    build:
+      context: .
+      args:
+        APP_UID: "1000"
+        APP_GID: "1000"
+    container_name: job-hunter
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/app

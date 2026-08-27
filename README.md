@@ -175,31 +175,57 @@ python bot.py           # só o bot, sem scraping automático
 mesmo token fazem a API do Telegram devolver 409 Conflict e os dois processos
 passam a perder mensagens.
 
-Para deixar rodando depois de fechar o terminal, no Linux, a forma mais simples
-é um serviço de usuário do systemd:
+Para deixar rodando depois de fechar o terminal, num servidor, use o Docker
+Compose descrito na seção 6.1 abaixo em vez de rodar `run_all.py` direto no
+terminal.
 
-```ini
-# ~/.config/systemd/user/job-hunter.service
-[Unit]
-Description=Job Hunter
-After=network-online.target
+### 6.1 Rodando como serviço num servidor
 
-[Service]
-WorkingDirectory=%h/job-hunter
-ExecStart=%h/job-hunter/venv/bin/python run_all.py
-Restart=on-failure
-RestartSec=30
+O job-hunter roda em produção com Docker Compose — builda uma imagem a partir
+do `Dockerfile` e sobe o mesmo `run_all.py` dentro do container, com
+`restart: always` pra voltar sozinho depois de reboot ou crash.
 
-[Install]
-WantedBy=default.target
-```
+#### Setup inicial numa máquina nova
 
 ```bash
-systemctl --user daemon-reload
-systemctl --user enable --now job-hunter
-systemctl --user status job-hunter
-journalctl --user -u job-hunter -f      # acompanhar os logs
+git clone <url-do-seu-repositorio>
+cd job-hunter
+
+cp .env.example .env        # preencha como descrito na seção 4
+cp data/master_profile.example.yaml data/master_profile.yaml   # seção 5
+
+docker compose up -d --build
 ```
+
+O `docker-compose.yml` monta o repositório inteiro como volume (`.:/app`), então
+`job_hunter.db`, `documents/`, `output/` etc. ficam no seu disco e sobrevivem
+a um `docker compose up -d --build` novo, e o container roda com o mesmo
+uid/gid do seu usuário (`APP_UID`/`APP_GID` no `docker-compose.yml`) para
+esses arquivos não virarem donos de root.
+
+Depois de rodar, confira:
+
+```bash
+docker compose logs -f     # acompanhar os logs
+docker ps                  # ver se o container está "Up"
+```
+
+#### Deploy do dia a dia
+
+Depois que o container já está de pé, para subir mudanças novas:
+
+```bash
+./deploy.sh
+```
+
+Isso dá `git pull` e, se algo mudou, `docker compose up -d --build`
+(rebuilda a imagem e reinicia o container), conferindo no final se ele
+realmente subiu — se não subiu, o script termina com erro e mostra as
+últimas linhas de log em vez de terminar silencioso.
+
+**Não rode o container e `python run_all.py`/`python bot.py` direto no host ao
+mesmo tempo:** dois long pollings com o mesmo token do Telegram fazem a API
+devolver 409 Conflict e os dois processos passam a perder mensagens.
 
 ---
 
