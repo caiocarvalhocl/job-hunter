@@ -44,3 +44,19 @@ async def test_duplicate_url_not_reprocessed(db_session):
     await main.process_job(raw, db_session)
     assert await main.process_job(raw, db_session) is False
     assert db_session.query(Job).count() == 1
+
+
+async def test_ignored_job_tagged_with_run_batch(db_session):
+    import main
+    ok = await main.process_job(_raw(url="https://x.com/4"), db_session,
+                                 run_batch="2026-08-27T10:00:00+00:00")
+    assert ok is False
+    job = db_session.query(Job).one()
+    assert job.run_batch == "2026-08-27T10:00:00+00:00"
+
+
+async def test_run_batch_defaults_to_none(db_session):
+    import main
+    await main.process_job(_raw(url="https://x.com/5"), db_session)
+    job = db_session.query(Job).one()
+    assert job.run_batch is None

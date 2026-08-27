@@ -17,6 +17,7 @@ since this is a personal assistant, not a public bot.
 """
 import json
 import logging
+from datetime import datetime
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -53,7 +54,11 @@ HELP_TEXT = (
     "Acrescente `en` ou `pt` para forçar o idioma \\(ex\\.: `/cv a1b2c3d4 en`\\)\\.\n\n"
     "`/cvpadrao` — envia o CV padrão direto do perfil, sem adaptar para "
     "nenhuma vaga \\(`en`/`pt` para o idioma, ex\\.: `/cvpadrao en`\\)\\.\n\n"
-    "`/lista` — mostra as vagas candidatas com seus ids\\."
+    "`/lista` — mostra as vagas candidatas com seus ids, ordenadas por score\\.\n"
+    "`/listar` — mostra TODAS as vagas da última rodada de scraping, sem "
+    "ordenar por score \\(inclusive as que o filtro automático descartou\\)\\. "
+    "Peça os documentos com `/cv`, `/cover` ou `/docs` em qualquer id da "
+    "lista\\."
 )
 
 
@@ -314,6 +319,56 @@ async def cmd_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.close()
 
 
+async def cmd_listar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _authorized(update):
+        return
+    db = SessionLocal()
+    try:
+        last = (
+            db.query(Job.run_batch)
+            .filter(Job.run_batch.isnot(None))
+            .order_by(Job.run_batch.desc())
+            .first()
+        )
+        if not last:
+            await update.message.reply_text(
+                "Ainda não tenho nenhuma rodada de scraping registrada "
+                "(rode main.py, scheduler.py ou run_all.py pelo menos uma vez)."
+            )
+            return
+        run_batch = last[0]
+
+        jobs = (
+            db.query(Job)
+            .filter(Job.run_batch == run_batch)
+            .order_by(Job.company, Job.title)
+            .all()
+        )
+        if not jobs:
+            await update.message.reply_text("A última rodada não trouxe vagas novas.")
+            return
+
+        when = datetime.fromisoformat(run_batch).strftime("%d/%m %H:%M")
+        lines = [f"🕐 Última rodada: {when} — {len(jobs)} vaga(s) encontrada(s)\n"]
+        SHOWN = 40
+        for j in jobs[:SHOWN]:
+            docs = ("📄" if j.cover_letter else "") + ("🎯" if j.tailored_cv else "")
+            score = f"{j.fit_score:.0f}" if j.fit_score is not None else "?"
+            # 🚫 marca as que o pipeline descartou automaticamente (score baixo,
+            # nível fora do alvo, PCD, região etc.) — ainda assim pedíveis via /cv.
+            flag = "🚫" if j.status == "ignored" else "✅"
+            lines.append(f"{flag} `{j.id[:8]}` [{score}] {j.title[:40]} — {j.company or '?'} {docs}")
+        if len(jobs) > SHOWN:
+            lines.append(f"\n… e mais {len(jobs) - SHOWN} vaga(s).")
+        lines.append(
+            "\n⚙️ `/cv <id>` · `/cover <id>` · `/docs <id>` — funciona em "
+            "qualquer id acima, mesmo nas marcadas 🚫."
+        )
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    finally:
+        db.close()
+
+
 def register_handlers(app: Application) -> Application:
     """Attach every command handler to an Application.
 
@@ -327,6 +382,7 @@ def register_handlers(app: Application) -> Application:
     app.add_handler(CommandHandler("docs", cmd_docs))
     app.add_handler(CommandHandler(["cvpadrao", "padrao"], cmd_cv_padrao))
     app.add_handler(CommandHandler(["lista", "list"], cmd_lista))
+    app.add_handler(CommandHandler("listar", cmd_listar))
     app.add_handler(CommandHandler(["ajuda", "help", "start"], cmd_ajuda))
     return app
 

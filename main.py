@@ -64,7 +64,8 @@ def job_already_seen(db: Session, url: str) -> bool:
     return db.query(Job).filter(Job.url == url).first() is not None
 
 
-def save_job(db: Session, raw: RawJob, score: float, summary: str, seniority: str = None) -> Job:
+def save_job(db: Session, raw: RawJob, score: float, summary: str, seniority: str = None,
+             run_batch: str = None) -> Job:
     job = Job(
         source=raw.source,
         external_id=raw.external_id,
@@ -79,6 +80,7 @@ def save_job(db: Session, raw: RawJob, score: float, summary: str, seniority: st
         fit_score=score,
         fit_summary=summary,
         status="new",
+        run_batch=run_batch,
     )
     db.add(job)
     try:
@@ -90,7 +92,8 @@ def save_job(db: Session, raw: RawJob, score: float, summary: str, seniority: st
     return job
 
 
-def _record_ignored(db: Session, raw: RawJob, level: str, reason: str) -> bool:
+def _record_ignored(db: Session, raw: RawJob, level: str, reason: str,
+                     run_batch: str = None) -> bool:
     """Persist a job as ignored with a reason and return False (skipped)."""
     job = Job(
         source=raw.source,
@@ -102,6 +105,7 @@ def _record_ignored(db: Session, raw: RawJob, level: str, reason: str) -> bool:
         seniority=level,
         fit_summary=reason,
         status="ignored",
+        run_batch=run_batch,
     )
     db.add(job)
     try:
@@ -111,7 +115,7 @@ def _record_ignored(db: Session, raw: RawJob, level: str, reason: str) -> bool:
     return False
 
 
-async def process_job(raw: RawJob, db: Session) -> bool:
+async def process_job(raw: RawJob, db: Session, run_batch: str = None) -> bool:
     if job_already_seen(db, raw.url):
         return False
 
@@ -121,11 +125,11 @@ async def process_job(raw: RawJob, db: Session) -> bool:
 
     if is_above_target(raw.title, settings.accept_pleno):
         print(f"  🚫 Acima do nível alvo ({level}) — skipping before scoring")
-        return _record_ignored(db, raw, level, f"Filtrado: acima do nível alvo ({level})")
+        return _record_ignored(db, raw, level, f"Filtrado: acima do nível alvo ({level})", run_batch)
 
     if not raw.is_remote and not (settings.allow_onsite_in_region and is_local_region(raw.location)):
         print(f"  🏢 Presencial/híbrido fora da região — skipping before scoring")
-        return _record_ignored(db, raw, level, "Filtrado: presencial/híbrido fora do sudoeste do PR")
+        return _record_ignored(db, raw, level, "Filtrado: presencial/híbrido fora do sudoeste do PR", run_batch)
 
     # PCD affirmative-action postings are reserved for candidates with
     # disabilities; skip before scoring, unless this instance turned the
@@ -133,17 +137,17 @@ async def process_job(raw: RawJob, db: Session) -> bool:
     # running it is PCD and wants those postings.
     if settings.exclude_pcd_reserved and is_pcd_reserved(raw.title, raw.description):
         print(f"  ♿ Vaga afirmativa reservada para PCD — skipping before scoring")
-        return _record_ignored(db, raw, level, "Filtrado: vaga afirmativa reservada para PCD")
+        return _record_ignored(db, raw, level, "Filtrado: vaga afirmativa reservada para PCD", run_batch)
 
     # Per-track geographic policy: dev anywhere; QA/support only abroad.
     track_ok, track_reason = is_track_location_allowed(raw)
     if not track_ok:
         print(f"  🌐 {track_reason} — skipping before scoring")
-        return _record_ignored(db, raw, level, track_reason)
+        return _record_ignored(db, raw, level, track_reason, run_batch)
 
     if not is_brazil_eligible(raw):
         print(f"  🌎 Not open to Brazil-based candidates — skipping before scoring")
-        return _record_ignored(db, raw, level, "Filtrado: vaga restrita a outro país/região")
+        return _record_ignored(db, raw, level, "Filtrado: vaga restrita a outro país/região", run_batch)
 
     result = await score_job_fit(raw)
     if result is None:
@@ -164,6 +168,7 @@ async def process_job(raw: RawJob, db: Session) -> bool:
             fit_score=score,
             fit_summary=summary,
             status="ignored",
+            run_batch=run_batch,
         )
         db.add(job)
         try:
@@ -174,7 +179,7 @@ async def process_job(raw: RawJob, db: Session) -> bool:
 
     # Documents are no longer generated automatically. Use:
     #   python generate.py <id> [--cover] [--cv] [--lang pt|en]
-    job = save_job(db, raw, score, summary, seniority=level)
+    job = save_job(db, raw, score, summary, seniority=level, run_batch=run_batch)
     if not job:
         return False
 
@@ -193,6 +198,7 @@ async def run():
     print(f"🚀 Job Hunter starting at {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'='*50}")
 
+    run_batch = datetime.now(timezone.utc).isoformat()
     db = SessionLocal()
     scrapers = get_all_scrapers()
     total_found = total_new = total_notified = 0
@@ -206,7 +212,7 @@ async def run():
                 for raw in raw_jobs:
                     if not job_already_seen(db, raw.url):
                         total_new += 1
-                        if await process_job(raw, db):
+                        if await process_job(raw, db, run_batch):
                             total_notified += 1
                         await asyncio.sleep(1)
             except Exception as e:

@@ -34,6 +34,7 @@ class Job(Base):
     tailored_cv = Column(Text, nullable=True)  # resolved CV dict as JSON
 
     status = Column(String, default="new")  # new | notified | applied | rejected | ignored
+    run_batch = Column(String, nullable=True)  # timestamp ISO da rodada de scraping que achou a vaga
 
     found_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     notified_at = Column(DateTime, nullable=True)
@@ -59,6 +60,10 @@ def _migrate_sqlite():
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN seniority VARCHAR"))
         print("🛠️  Migration: added jobs.seniority column")
+    if "run_batch" not in existing:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN run_batch VARCHAR"))
+        print("🛠️  Migration: added jobs.run_batch column")
 
 
 def init_db():
