@@ -319,6 +319,14 @@ async def cmd_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.close()
 
 
+def _escape_md(text: str) -> str:
+    """Escapa caracteres especiais do Markdown legado (_, *, `, [) para não
+    quebrar o parse_mode="Markdown" quando o texto vem de fora (ex.: URLs)."""
+    for ch in ("_", "*", "`", "["):
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
+
 async def cmd_listar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _authorized(update):
         return
@@ -357,7 +365,10 @@ async def cmd_listar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 🚫 marca as que o pipeline descartou automaticamente (score baixo,
             # nível fora do alvo, PCD, região etc.) — ainda assim pedíveis via /cv.
             flag = "🚫" if j.status == "ignored" else "✅"
-            lines.append(f"{flag} `{j.id[:8]}` [{score}] {j.title[:40]} — {j.company or '?'} {docs}")
+            lines.append(
+                f"{flag} `{j.id[:8]}` [{score}] {j.title[:40]} — {j.company or '?'} {docs}\n"
+                f"{_escape_md(j.url)}"
+            )
         if len(jobs) > SHOWN:
             lines.append(f"\n… e mais {len(jobs) - SHOWN} vaga(s).")
         lines.append(
