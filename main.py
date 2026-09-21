@@ -193,7 +193,27 @@ async def process_job(raw: RawJob, db: Session, run_batch: str = None) -> bool:
     return success
 
 
+# Uma rodada por vez: o scheduler e o /run do bot rodam no mesmo processo (via
+# run_all.py) e não devem varrer em paralelo, senão a cota da LLM é gasta em
+# dobro e a mesma vaga pode ser processada duas vezes.
+_run_lock = asyncio.Lock()
+
+
+def is_running() -> bool:
+    return _run_lock.locked()
+
+
 async def run():
+    """Executa uma rodada completa. Devolve {"found", "new", "notified"}, ou
+    None se já havia outra rodada em andamento (este disparo é descartado)."""
+    if _run_lock.locked():
+        print("⏭️  Já existe uma rodada em andamento — ignorando este disparo")
+        return None
+    async with _run_lock:
+        return await _run_pipeline()
+
+
+async def _run_pipeline():
     print(f"\n{'='*50}")
     print(f"🚀 Job Hunter starting at {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'='*50}")
@@ -226,6 +246,7 @@ async def run():
     print(f"{'='*50}\n")
 
     await notify_run_summary(total_found, total_new, total_notified)
+    return {"found": total_found, "new": total_new, "notified": total_notified}
 
 
 if __name__ == "__main__":

@@ -10,20 +10,25 @@ Commands:
     /vaga <url>\\n<texto>     — same, but use the pasted text instead of
                                 fetching (zero automated access; use this for
                                 LinkedIn postings behind a login wall)
+    /run                     — force a scraping run right now
+    /log [n]                 — recent LLM calls: proves which models are answering
     /ajuda                   — show this help
 
 Only messages from TELEGRAM_CHAT_ID are processed; everyone else is ignored,
 since this is a personal assistant, not a public bot.
 """
+import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from config.settings import get_settings
-from db.models import init_db, SessionLocal, Job
+from db.models import init_db, SessionLocal, Job, LLMCall
+import llm
+import main as pipeline
 from scrapers.base import RawJob
 from scrapers.single_fetch import fetch_posting
 from filters.seniority_filter import detect_level, is_above_target
@@ -54,6 +59,10 @@ HELP_TEXT = (
     "Acrescente `en` ou `pt` para forçar o idioma \\(ex\\.: `/cv a1b2c3d4 en`\\)\\.\n\n"
     "`/cvpadrao` — envia o CV padrão direto do perfil, sem adaptar para "
     "nenhuma vaga \\(`en`/`pt` para o idioma, ex\\.: `/cvpadrao en`\\)\\.\n\n"
+    "`/run` — força uma rodada de scraping agora, sem esperar o agendamento "
+    "\\(avisa quando terminar e quantas chamadas ao modelo ela fez\\)\\.\n"
+    "`/log` — mostra as últimas chamadas aos modelos \\(provider, modelo, "
+    "latência, tokens, erros\\); `/log 25` mostra mais linhas\\.\n\n"
     "`/lista` — mostra as vagas candidatas com seus ids, ordenadas por score\\.\n"
     "`/listar` — mostra TODAS as vagas da última rodada de scraping, sem "
     "ordenar por score \\(inclusive as que o filtro automático descartou\\)\\. "
@@ -380,6 +389,168 @@ async def cmd_listar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.close()
 
 
+
+# ── /run e /log ──────────────────────────────────────────────────────────────
+
+# Referências fortes às rodadas em background: o event loop só guarda referência
+# fraca às tasks, então sem isto uma rodada longa poderia ser coletada no meio.
+_background_runs: set[asyncio.Task] = set()
+
+LOG_DEFAULT_LINES = 10
+LOG_MAX_LINES = 30
+
+
+def _utcnow_naive() -> datetime:
+    """UTC sem tzinfo, o formato em que o SQLite devolve LLMCall.ts."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _local_hhmm(ts: datetime) -> str:
+    return ts.replace(tzinfo=timezone.utc).astimezone().strftime("%d/%m %H:%M:%S")
+
+
+def _short_model(model: str) -> str:
+    return (model or "?").split("/")[-1]
+
+
+def summarize_llm_calls(db, since: datetime) -> str:
+    """Uma linha por provider/modelo com as chamadas desde `since`.
+
+    Devolve "" quando não houve nenhuma chamada. Função pura sobre a sessão,
+    para o /run e o /log compartilharem o mesmo resumo.
+    """
+    calls = db.query(LLMCall).filter(LLMCall.ts >= since).all()
+    groups: dict[tuple[str, str], list[LLMCall]] = {}
+    for c in calls:
+        groups.setdefault((c.provider, c.model), []).append(c)
+    lines = []
+    for (provider, model), group in sorted(groups.items()):
+        ok = [c for c in group if c.ok]
+        failed = len(group) - len(ok)
+        avg = (sum(c.latency_ms or 0 for c in ok) / len(ok) / 1000) if ok else 0
+        tokens = sum((c.prompt_tokens or 0) + (c.completion_tokens or 0) for c in ok)
+        line = f"• {provider}/{_short_model(model)}: {len(ok)} ok"
+        if failed:
+            line += f", {failed} falha(s)"
+        if ok:
+            line += f" · média {avg:.1f}s · {tokens} tokens"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def format_llm_log(db, n: int = LOG_DEFAULT_LINES) -> str:
+    """Texto do /log: modelos configurados, resumo das últimas 24h e as `n`
+    chamadas mais recentes (texto puro, sem Markdown, para não quebrar com
+    mensagens de erro que trazem _ * ` [)."""
+    n = max(1, min(n, LOG_MAX_LINES))
+    header = [
+        "🧠 Job Hunter — modelos",
+        f"Principal: groq/{llm.GROQ_MODEL}",
+        "Fallback: "
+        + (f"anthropic/{llm.CLAUDE_FALLBACK_MODEL}" if llm._fallback_enabled()
+           else "desligado (sem ANTHROPIC_API_KEY)"),
+    ]
+
+    recent = (
+        db.query(LLMCall).order_by(LLMCall.ts.desc(), LLMCall.id.desc()).limit(n).all()
+    )
+    if not recent:
+        return "\n".join(header + [
+            "",
+            "Nenhuma chamada a modelo registrada ainda. Rode /run e confira de "
+            "novo. Se a rodada não achar nenhuma vaga nova, ela também não chama "
+            "o modelo (só pontua vagas ainda não vistas).",
+        ])
+
+    day = summarize_llm_calls(db, _utcnow_naive() - timedelta(hours=24))
+    last_ok = (
+        db.query(LLMCall).filter(LLMCall.ok.is_(True))
+        .order_by(LLMCall.ts.desc(), LLMCall.id.desc()).first()
+    )
+
+    lines = header + ["", "Últimas 24h:", day or "• (nenhuma chamada)"]
+    lines.append(
+        f"Última chamada com sucesso: {_local_hhmm(last_ok.ts)}"
+        if last_ok else "⚠️ Nenhuma chamada com sucesso registrada."
+    )
+    lines += ["", f"Chamadas mais recentes ({len(recent)}):"]
+    for c in recent:
+        who = f"{c.provider}/{_short_model(c.served_model or c.model)}"
+        if c.ok:
+            tok = (f" {c.prompt_tokens or 0}→{c.completion_tokens or 0} tok"
+                   if c.prompt_tokens is not None else "")
+            warn = " ⚠️ resposta vazia" if not c.output_chars else ""
+            lines.append(
+                f"✅ {_local_hhmm(c.ts)} {c.context or '?'} {who} "
+                f"{(c.latency_ms or 0) / 1000:.1f}s{tok}{warn}"
+            )
+        else:
+            lines.append(
+                f"❌ {_local_hhmm(c.ts)} {c.context or '?'} {who} "
+                f"{(c.error or 'erro')[:70]}"
+            )
+    return "\n".join(lines)
+
+
+async def _run_and_report(update: Update):
+    """Corpo da rodada forçada: roda o pipeline e devolve o resumo no chat."""
+    started = _utcnow_naive()
+    try:
+        result = await pipeline.run()
+    except Exception as e:  # noqa: BLE001
+        log.exception("/run: rodada forçada falhou")
+        await update.message.reply_text(f"❌ A rodada falhou: {e}")
+        return
+
+    if result is None:
+        await update.message.reply_text(
+            "⏭️ Já havia uma rodada em andamento, então não iniciei outra.")
+        return
+
+    db = SessionLocal()
+    try:
+        usage = summarize_llm_calls(db, started)
+    finally:
+        db.close()
+    await update.message.reply_text(
+        f"✅ Rodada forçada concluída: {result['found']} encontradas, "
+        f"{result['new']} novas, {result['notified']} notificadas.\n"
+        + (f"🧠 Chamadas ao modelo nesta rodada:\n{usage}" if usage else
+           "🧠 Nenhuma chamada ao modelo (nenhuma vaga nova passou pelos filtros "
+           "até o scoring).")
+        + "\n\nDetalhes: /log"
+    )
+
+
+async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _authorized(update):
+        return
+    if pipeline.is_running():
+        await update.message.reply_text(
+            "⏳ Já tem uma rodada em andamento. Aviso quando ela terminar.")
+        return
+    await update.message.reply_text(
+        "🚀 Rodada forçada iniciada. Pode levar alguns minutos; aviso quando terminar.")
+    # Em background para o bot continuar respondendo (/log, /lista...) durante
+    # a varredura; com await direto o polling ficaria travado até o fim.
+    task = asyncio.create_task(_run_and_report(update))
+    _background_runs.add(task)
+    task.add_done_callback(_background_runs.discard)
+
+
+async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _authorized(update):
+        return
+    parts = (update.message.text or "").split()
+    n = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else LOG_DEFAULT_LINES
+    db = SessionLocal()
+    try:
+        text = format_llm_log(db, n)
+    finally:
+        db.close()
+    await update.message.reply_text(text)
+
+
 def register_handlers(app: Application) -> Application:
     """Attach every command handler to an Application.
 
@@ -394,6 +565,8 @@ def register_handlers(app: Application) -> Application:
     app.add_handler(CommandHandler(["cvpadrao", "padrao"], cmd_cv_padrao))
     app.add_handler(CommandHandler(["lista", "list"], cmd_lista))
     app.add_handler(CommandHandler("listar", cmd_listar))
+    app.add_handler(CommandHandler("run", cmd_run))
+    app.add_handler(CommandHandler("log", cmd_log))
     app.add_handler(CommandHandler(["ajuda", "help", "start"], cmd_ajuda))
     return app
 

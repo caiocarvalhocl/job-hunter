@@ -44,6 +44,29 @@ class Job(Base):
         return f"<Job {self.title} @ {self.company} [{self.source}] score={self.fit_score}>"
 
 
+class LLMCall(Base):
+    """Uma tentativa de chamada a um modelo (Groq ou fallback Claude).
+
+    Existe para provar, depois do fato, que o pipeline está de fato falando
+    com os modelos: qual provider/modelo respondeu, quanto demorou, quantos
+    tokens gastou e por que falhou. Gravada por llm.chat(), lida pelo /log.
+    """
+    __tablename__ = "llm_calls"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ts = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)  # UTC
+    provider = Column(String, nullable=False)   # groq | anthropic
+    model = Column(String, nullable=False)      # modelo pedido
+    served_model = Column(String, nullable=True)  # modelo que a API diz ter usado
+    context = Column(String, nullable=True)     # FILTER | COVER | CV ...
+    ok = Column(Boolean, default=False)
+    latency_ms = Column(Integer, nullable=True)
+    prompt_tokens = Column(Integer, nullable=True)
+    completion_tokens = Column(Integer, nullable=True)
+    output_chars = Column(Integer, nullable=True)  # 0 numa chamada "ok" = resposta vazia
+    error = Column(Text, nullable=True)
+
+
 def _migrate_sqlite():
     """Additive, idempotent migration for pre-existing SQLite databases.
 
