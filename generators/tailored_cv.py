@@ -36,7 +36,7 @@ def _selectable_view(profile: dict, lang: str) -> dict:
         ],
         "projects": [
             {"id": p["id"], "name": p["name"], "bullets": [{"id": b["id"], "text": b[lang]} for b in p["bullets"]]}
-            for p in profile["projects"]
+            for p in profile.get("projects") or []
         ],
     }
 
@@ -159,7 +159,7 @@ def _validate_and_resolve(plan: dict, profile: dict, lang: str) -> dict:
         })
 
     # Projects
-    valid_project_ids = {p["id"]: p for p in profile["projects"]}
+    valid_project_ids = {p["id"]: p for p in profile.get("projects") or []}
     chosen_pids = [pid for pid in plan.get("project_ids", []) if pid in valid_project_ids]
     if not chosen_pids:
         chosen_pids = list(valid_project_ids.keys())
@@ -167,7 +167,7 @@ def _validate_and_resolve(plan: dict, profile: dict, lang: str) -> dict:
     for pid in chosen_pids:
         p = valid_project_ids[pid]
         projects.append({
-            "header": f"{p['name']} | {', '.join(p['stack'])}",
+            "header": p["name"] + (f" | {', '.join(p['stack'])}" if p.get("stack") else ""),
             "bullets": [b[lang] for b in p["bullets"]],
         })
 
@@ -176,8 +176,8 @@ def _validate_and_resolve(plan: dict, profile: dict, lang: str) -> dict:
         "location": c["location"][lang],
         "phone": c["phone"],
         "email": c["email"],
-        "linkedin": c["linkedin"],
-        "github": c["github"],
+        "linkedin": c.get("linkedin") or "",
+        "github": c.get("github") or "",
         "website": c.get("website") or "",
     }
 
@@ -195,7 +195,7 @@ def _validate_and_resolve(plan: dict, profile: dict, lang: str) -> dict:
             for ed in profile["education"]
         ],
         "extracurricular_experience": extracurricular_experience,
-        "certifications": [cert[lang] for cert in profile["certifications"]],
+        "certifications": [cert[lang] for cert in profile.get("certifications") or []],
         "languages_label": profile["headings"]["languages"][lang],
         "languages": profile["languages"][lang],
         "_language": lang,

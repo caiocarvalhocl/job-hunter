@@ -36,25 +36,26 @@ def candidate_profile_text(lang: str = "en", profile: dict | None = None) -> str
     def line(label, value):
         return f"{label}: {value}" if value else ""
 
-    skills_flat = ", ".join(s for group in p["skills"].values() for s in group)
+    skills_flat = ", ".join(s for group in p.get("skills", {}).values() for s in group)
 
     exp_lines = []
-    for e in p["experience"]:
+    for e in p.get("experience", []):
         role = e["role"][lang]
-        org = e["org_note"][lang]
+        org = (e.get("org_note") or {}).get(lang, "")
         head = f"- {role} at {e['company']}" + (f" ({org})" if org else "")
         exp_lines.append(head)
         for b in e["bullets"]:
             exp_lines.append(f"    {b[lang]}")
 
     proj_lines = []
-    for pr in p["projects"]:
-        proj_lines.append(f"- {pr['name']} ({', '.join(pr['stack'])})")
+    for pr in p.get("projects") or []:
+        stack = ", ".join(pr.get("stack") or [])
+        proj_lines.append(f"- {pr['name']}" + (f" ({stack})" if stack else ""))
         for b in pr["bullets"]:
             proj_lines.append(f"    {b[lang]}")
 
-    edu_lines = [f"- {ed['degree'][lang]}, {ed['school'][lang]} ({ed['period']})" for ed in p["education"]]
-    cert_lines = [f"- {c[lang]}" for c in p["certifications"]]
+    edu_lines = [f"- {ed['degree'][lang]}, {ed['school'][lang]} ({ed['period']})" for ed in p.get("education") or []]
+    cert_lines = [f"- {c[lang]}" for c in p.get("certifications") or []]
 
     return "\n".join(filter(None, [
         line("Name", p["name"]),
@@ -63,20 +64,16 @@ def candidate_profile_text(lang: str = "en", profile: dict | None = None) -> str
         "Summary:",
         p["summary"][lang],
         "",
-        "Tech stack:",
+        "Skills:",
         skills_flat,
         "",
         "Experience:",
         *exp_lines,
         "",
-        "Projects:",
-        *proj_lines,
-        "",
+        *(["Projects:", *proj_lines, ""] if proj_lines else []),
         "Education:",
         *edu_lines,
         "",
-        "Certifications:",
-        *cert_lines,
-        "",
-        line("Languages", p["languages"][lang]),
+        *(["Certifications:", *cert_lines, ""] if cert_lines else []),
+        line("Languages", (p.get("languages") or {}).get(lang, "")),
     ]))

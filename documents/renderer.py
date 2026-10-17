@@ -202,15 +202,15 @@ def _contact_story(cv: dict, s: dict) -> list:
     c = cv["contact"]
     line1_parts = [_esc(c["location"]), _esc(c["phone"]),
                    _link(c["email"], f"mailto:{c['email']}")]
-    line2_parts = [_link(c["linkedin"], _url(c["linkedin"]))]
+    line2_parts = [_link(c["linkedin"], _url(c["linkedin"]))] if c.get("linkedin") else []
     if c.get("github"):
         line2_parts.append(_link(c["github"], _url(c["github"])))
     if c.get("website"):
         line2_parts.append(_link(c["website"], _url(c["website"])))
-    return [
-        Paragraph(" | ".join(line1_parts), s["contact"]),
-        Paragraph(" | ".join(line2_parts), s["contact"]),
-    ]
+    story = [Paragraph(" | ".join(line1_parts), s["contact"])]
+    if line2_parts:
+        story.append(Paragraph(" | ".join(line2_parts), s["contact"]))
+    return story
 
 
 def _build_cv_story(cv: dict, s: dict, cap_bullets: int | None) -> list:
