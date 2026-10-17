@@ -51,6 +51,15 @@ class Settings(BaseSettings):
     # Desligue (false) se você é candidato PCD e quer receber essas vagas.
     exclude_pcd_reserved: bool = True
 
+    # Vagas dos e-mails do LinkedIn (recomendações e alertas) lidas por IMAP
+    # da sua caixa do Gmail, sem acessar o linkedin.com
+    # (scrapers/linkedin_email.py). IMAP_APP_PASSWORD é uma senha de app do
+    # Google, não a senha da conta.
+    linkedin_email_enabled: bool = False
+    imap_user: str = ""
+    imap_app_password: str = ""
+    linkedin_email_days: int = 3
+
     # Database
     database_url: str = "sqlite:///./job_hunter.db"
 

@@ -24,6 +24,7 @@ from scrapers.gupy import GupyScraper
 from scrapers.jobicy import JobicyScraper
 from scrapers.vagas_com_br import VagasComBrScraper
 from scrapers.infojobs import InfoJobsScraper
+from scrapers.linkedin_email import LinkedInEmailScraper
 # scrapers.indeed.IndeedScraper intentionally NOT wired in: Indeed added a
 # Cloudflare challenge + login wall past page 1 in 2026 and its ToS explicitly
 # prohibits automated scraping. A plain aiohttp+BeautifulSoup scraper will
@@ -54,6 +55,8 @@ def get_all_scrapers():
         VagasComBrScraper(**kwargs),
         InfoJobsScraper(**kwargs),
     ]
+    if settings.linkedin_email_enabled:
+        scrapers.append(LinkedInEmailScraper(**kwargs))
     # Config-driven boards (scrapers/generic_sources.py). Only confirmed
     # endpoints live in ENABLED_SOURCES, so this stays empty until a board is
     # verified rather than adding scrapers that silently return zero.

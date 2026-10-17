@@ -267,6 +267,23 @@ Vaga adicionada manualmente pula os filtros de nível e de trilha, porque você
 já decidiu que quer aquela vaga. O bot avisa se ela estaria fora da sua
 política, mas salva mesmo assim.
 
+### Vagas do LinkedIn por e-mail
+
+O LinkedIn manda vagas por e-mail (recomendações e alertas de busca salva). Com
+`LINKEDIN_EMAIL_ENABLED=true`, cada rodada lê esses e-mails dos últimos
+`LINKEDIN_EMAIL_DAYS` dias da sua caixa do Gmail por IMAP e passa as vagas pelo
+mesmo fluxo das outras fontes. A caixa é aberta só para leitura: nada é
+marcado como lido nem movido.
+
+O linkedin.com não é acessado: título, empresa e local vêm do próprio e-mail,
+e a vaga é pontuada sem a descrição. Para o CV adaptado ficar melhor, mande a
+vaga pelo `/vaga` colando o texto, como acima.
+
+Configuração: ative a verificação em duas etapas na conta Google, crie uma
+senha de app (Conta Google → Segurança → Senhas de app) e preencha
+`IMAP_USER` e `IMAP_APP_PASSWORD` no `.env`. Para receber mais vagas, crie
+alertas no LinkedIn (busca de vagas → "Criar alerta") com frequência diária.
+
 ### Listar as vagas salvas
 
 ```
