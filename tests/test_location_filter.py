@@ -82,3 +82,28 @@ def test_region_cities_match(location):
 ])
 def test_outside_region_does_not_match(location):
     assert not is_local_region(location)
+
+
+# ── Vagas afirmativas PCD ────────────────────────────────────────────────────
+
+from filters.location_filter import is_pcd_reserved
+
+
+@pytest.mark.parametrize("title", [
+    "Desenvolvedor Java Júnior - PCD",
+    "Analista de Sistemas (PcD)",
+    "Banco de Talentos PCDs | Tecnologia",
+    "Vaga para Pessoa com Deficiência - Dev Backend",
+])
+def test_pcd_in_title_is_reserved(title):
+    assert is_pcd_reserved(title)
+
+
+def test_explicit_reservation_in_description_is_reserved():
+    assert is_pcd_reserved("Desenvolvedor Java", "Esta é uma vaga afirmativa para PCD.")
+
+
+def test_diversity_boilerplate_is_not_reserved():
+    assert not is_pcd_reserved(
+        "Desenvolvedor Java",
+        "Encorajamos candidaturas de pessoas com deficiência, mulheres e pessoas negras.")

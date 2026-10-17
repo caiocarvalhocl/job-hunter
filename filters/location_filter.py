@@ -163,14 +163,23 @@ _PCD_PATTERNS = [
 ]
 _PCD_RE = re.compile("|".join(_PCD_PATTERNS), re.IGNORECASE)
 
+# In a title, PCD on its own already marks the opening as reserved
+# ("Desenvolvedor Java Júnior - PCD", "Analista (PcD)"). LinkedIn e-mail jobs
+# have no description, so the title is all there is to go on.
+_PCD_TITLE_RE = re.compile(
+    r"\bpcds?\b|\bpessoas?\s+com\s+defici[êe]ncia\b", re.IGNORECASE)
+
 
 def is_pcd_reserved(title: str, description: str = "") -> bool:
     """True when a posting is an affirmative-action opening reserved for PCD
     (pessoa com deficiência) candidates.
 
-    Requires explicit "vaga afirmativa / reservada / exclusiva" framing so
-    that generic diversity boilerplate ("encorajamos candidaturas de pessoas
-    com deficiência") does not produce false positives.
+    The title alone counts when it names PCD. The description needs explicit
+    "vaga afirmativa / reservada / exclusiva" framing, so that diversity
+    boilerplate ("encorajamos candidaturas de pessoas com deficiência") does
+    not produce false positives.
     """
+    if _PCD_TITLE_RE.search(title or ""):
+        return True
     text = f"{title} {description[:500]}"
     return bool(_PCD_RE.search(text))
