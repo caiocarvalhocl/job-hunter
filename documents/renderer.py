@@ -15,6 +15,7 @@ real page count each time with pypdf until it fits (or the tightest step is
 reached, whichever comes first).
 """
 from io import BytesIO
+from pathlib import Path
 from xml.sax.saxutils import escape, quoteattr
 
 from pypdf import PdfReader
@@ -23,9 +24,22 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 _DARK = HexColor("#1a1a1a")
+
+# Liberation Sans is metric-compatible with Arial/Helvetica, so the layout is
+# unchanged, but unlike the built-in Helvetica it gets embedded in the PDF:
+# no font substitution on the reader/ATS side.
+_FONTS_DIR = Path(__file__).parent / "fonts"
+_REGULAR, _BOLD, _ITALIC = "LiberationSans", "LiberationSans-Bold", "LiberationSans-Italic"
+pdfmetrics.registerFont(TTFont(_REGULAR, _FONTS_DIR / "LiberationSans-Regular.ttf"))
+pdfmetrics.registerFont(TTFont(_BOLD, _FONTS_DIR / "LiberationSans-Bold.ttf"))
+pdfmetrics.registerFont(TTFont(_ITALIC, _FONTS_DIR / "LiberationSans-Italic.ttf"))
+pdfmetrics.registerFontFamily(_REGULAR, normal=_REGULAR, bold=_BOLD,
+                              italic=_ITALIC, boldItalic=_BOLD)
 
 # Degrade steps for the CV, from most to least comfortable. Each step is
 # tried in order; the first one that renders to a single page wins.
@@ -55,32 +69,32 @@ def _link(display: str, href: str) -> str:
 def _styles(font: float, leading: float) -> dict:
     return {
         "name": ParagraphStyle(
-            "name", fontName="Helvetica-Bold", fontSize=17, leading=19,
+            "name", fontName=_BOLD, fontSize=17, leading=19,
             alignment=TA_CENTER, spaceAfter=1,
         ),
         "role_tag": ParagraphStyle(
-            "role_tag", fontName="Helvetica-Bold", fontSize=font + 1.5,
+            "role_tag", fontName=_BOLD, fontSize=font + 1.5,
             leading=leading + 1.5, alignment=TA_CENTER, textColor=_DARK,
             spaceAfter=3,
         ),
         "contact": ParagraphStyle(
-            "contact", fontName="Helvetica", fontSize=8.7, leading=11,
+            "contact", fontName=_REGULAR, fontSize=8.7, leading=11,
             alignment=TA_CENTER, textColor=_DARK, spaceAfter=1,
         ),
         "heading": ParagraphStyle(
-            "heading", fontName="Helvetica-Bold", fontSize=10.6, leading=13,
+            "heading", fontName=_BOLD, fontSize=10.6, leading=13,
             textColor=_DARK, spaceBefore=7, spaceAfter=2,
         ),
         "body": ParagraphStyle(
-            "body", fontName="Helvetica", fontSize=font, leading=leading,
+            "body", fontName=_REGULAR, fontSize=font, leading=leading,
             spaceAfter=2,
         ),
         "entry_header": ParagraphStyle(
-            "entry_header", fontName="Helvetica-Bold", fontSize=font,
+            "entry_header", fontName=_BOLD, fontSize=font,
             leading=leading, spaceBefore=3, spaceAfter=0,
         ),
         "entry_meta": ParagraphStyle(
-            "entry_meta", fontName="Helvetica-Oblique", fontSize=font - 0.5,
+            "entry_meta", fontName=_ITALIC, fontSize=font - 0.5,
             leading=leading - 0.5, textColor=_DARK, spaceAfter=1,
         ),
         "bullet": ParagraphStyle(
@@ -88,7 +102,7 @@ def _styles(font: float, leading: float) -> dict:
             # rather than reportlab's bulletText: that path mis-encodes "•" as a
             # control character in this reportlab version, which both looks wrong
             # and breaks text extraction (ATS parsers read raw text, not glyphs).
-            "bullet", fontName="Helvetica", fontSize=font, leading=leading,
+            "bullet", fontName=_REGULAR, fontSize=font, leading=leading,
             leftIndent=12, firstLineIndent=-12, spaceAfter=1,
         ),
     }
@@ -259,6 +273,8 @@ def cv_to_pdf(cv: dict, filename: str = "cv.pdf") -> BytesIO:
             buf, pagesize=A4,
             leftMargin=step["margin"], rightMargin=step["margin"],
             topMargin=step["margin"], bottomMargin=step["margin"],
+            title=f"{cv['name']} - CV", author=cv["name"],
+            subject=cv.get("role_tag", ""), initialFontName=_REGULAR,
         )
         doc.build(story)
 
