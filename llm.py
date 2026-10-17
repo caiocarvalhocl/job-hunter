@@ -23,7 +23,7 @@ from groq import AsyncGroq, RateLimitError, APIConnectionError, APIStatusError
 from config.settings import get_settings
 from db.models import SessionLocal, LLMCall
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 CLAUDE_FALLBACK_MODEL = "claude-haiku-4-5"
 
 _MAX_GROQ_RETRIES = 2          # short: on rate limit we'd rather switch provider
