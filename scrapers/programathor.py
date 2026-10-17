@@ -111,7 +111,15 @@ class ProgramathorScraper(BaseScraper):
         text = " ".join(card.get_text(" ", strip=True).split())
 
         title_el = anchor.select_one("h2, h3") or anchor
-        title = title_el.get_text(strip=True)
+        # Status badges are <span>s inside the title ("NOVA", "Vencida",
+        # "📍 PRESENCIAL - ..."). Joined with the title they hid the level from
+        # the seniority filter ("PlenoNOVA"), so read only the title's own text.
+        badges = {s.get_text(strip=True).lower() for s in title_el.find_all("span")}
+        if "vencida" in badges:
+            return None
+        title = " ".join(
+            t.strip() for t in title_el.find_all(string=True, recursive=False) if t.strip()
+        )
         if not title:
             # Fallback: derive from the URL slug
             slug = href.rsplit("-", 1)[0].split("/")[-1]

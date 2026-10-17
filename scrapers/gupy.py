@@ -43,12 +43,15 @@ class GupyScraper(BaseScraper):
             # Remote pass (nationwide)
             jobs.extend(await self._search_api(keyword, workplace_types="remote"))
 
-            # Regional pass: onsite/hybrid in Paraná. The pipeline keeps only
-            # the configured sudoeste-do-PR cities, so an over-broad state
-            # result set cannot leak through.
+            # Regional pass: onsite/hybrid in SEARCH_STATE, one query per
+            # SEARCH_CITIES city when set (the state-wide query returns only the
+            # 50 newest postings, mostly from the capital). The pipeline keeps
+            # only LOCAL_REGION_CITIES, so an over-broad result cannot leak.
             if settings.allow_onsite_in_region:
-                jobs.extend(await self._search_api(
-                    keyword, workplace_types=None, state="Paraná"))
+                for city in settings.search_cities_list or [None]:
+                    jobs.extend(await self._search_api(
+                        keyword, workplace_types=None, state=settings.search_state,
+                        city=city))
 
             await asyncio.sleep(2)
 
@@ -63,8 +66,10 @@ class GupyScraper(BaseScraper):
         return unique
 
     async def _search_api(self, keyword: str, workplace_types: str = None,
-                          state: str = None) -> List[RawJob]:
+                          state: str = None, city: str = None) -> List[RawJob]:
         params = {"jobName": keyword, "offset": 0, "limit": 50}
+        if city:
+            params["city"] = city
         if workplace_types:
             params["workplaceTypes"] = workplace_types
         if state:
@@ -124,6 +129,6 @@ class GupyScraper(BaseScraper):
             self.log(f"API error for '{keyword}': {e}")
             return []
 
-        scope = f"state={state}" if state else (workplace_types or "all")
+        scope = f"city={city}" if city else f"state={state}" if state else (workplace_types or "all")
         self.log(f"'{keyword}' ({scope}) → {len(jobs)} jobs")
         return jobs

@@ -16,9 +16,14 @@ from scrapers.weworkremotely import WeWorkRemotelyScraper
 from scrapers.himalayas import HimalayasScraper
 from scrapers.programathor import ProgramathorScraper
 from scrapers.gupy import GupyScraper
-from scrapers.arbeitnow import ArbeitnowScraper
-from scrapers.remotive import RemotiveScraper
+# scrapers.arbeitnow.ArbeitnowScraper and scrapers.remotive.RemotiveScraper
+# intentionally NOT wired in: over Jul-Oct 2026 Arbeitnow returned ~10.8k
+# postings for 13 approvals, all German onsite/Werkstudent roles a Brazil-based
+# candidate can't take, and Remotive never produced an approval. Both cost LLM
+# calls for nothing. The scraper files are kept.
 from scrapers.jobicy import JobicyScraper
+from scrapers.vagas_com_br import VagasComBrScraper
+from scrapers.infojobs import InfoJobsScraper
 # scrapers.indeed.IndeedScraper intentionally NOT wired in: Indeed added a
 # Cloudflare challenge + login wall past page 1 in 2026 and its ToS explicitly
 # prohibits automated scraping. A plain aiohttp+BeautifulSoup scraper will
@@ -45,9 +50,9 @@ def get_all_scrapers():
         HimalayasScraper(**kwargs),
         ProgramathorScraper(**kwargs),
         GupyScraper(**kwargs),
-        ArbeitnowScraper(**kwargs),
-        RemotiveScraper(**kwargs),
         JobicyScraper(**kwargs),
+        VagasComBrScraper(**kwargs),
+        InfoJobsScraper(**kwargs),
     ]
     # Config-driven boards (scrapers/generic_sources.py). Only confirmed
     # endpoints live in ENABLED_SOURCES, so this stays empty until a board is

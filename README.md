@@ -103,6 +103,8 @@ padrão razoável:
 | `ACCEPT_PLENO` | `true` se você também aceita vaga de pleno |
 | `ALLOW_ONSITE_IN_REGION` | aceita presencial/híbrido nas cidades abaixo |
 | `LOCAL_REGION_CITIES` | suas cidades aceitáveis para presencial |
+| `SEARCH_STATE` | estado da busca presencial/híbrida (padrão `Paraná`) |
+| `SEARCH_CITIES` | cidades buscadas uma a uma no Gupy e no InfoJobs, em vez do estado inteiro |
 | `TRACK_RULES` | política geográfica por tipo de vaga (ver abaixo) |
 | `EXCLUDE_PCD_RESERVED` | `true` exclui vagas afirmativas para PCD |
 | `SCRAPE_INTERVAL_HOURS` | de quantas em quantas horas varrer (padrão 6) |
@@ -305,6 +307,8 @@ para `/cover`.
 | `/cover <id> [pt\|en]` | gera e envia a cover letter |
 | `/docs <id> [pt\|en]` | gera e envia os dois |
 | `/cvpadrao [pt\|en]` | envia o CV padrão direto do perfil, sem adaptar para nenhuma vaga |
+| `/run` | força uma rodada de scraping agora |
+| `/log [n]` | últimas chamadas aos modelos (provider, latência, tokens, erros) |
 
 Pelo terminal, `python generate.py <id> [--cv] [--cover] [--lang pt|en]` faz o
 mesmo, para quem preferir.
@@ -400,9 +404,34 @@ próxima rodada tenta de novo.
 
 ## 11. Fontes de vagas
 
-Ativas por API JSON pública, mais confiáveis: Remotive, Jobicy, Arbeitnow, We
-Work Remotely (RSS). Raspadas de HTML, mais frágeis porque os seletores podem
-mudar: Gupy, Programathor, Himalayas.
+Por API JSON pública, mais confiáveis: Jobicy, We Work Remotely (RSS), Gupy.
+Raspadas de HTML, mais frágeis porque os seletores podem mudar: Programathor,
+Himalayas, InfoJobs, Vagas.com.br.
+
+Os brasileiros buscam assim:
+
+| Fonte | Como | Busca |
+|---|---|---|
+| Gupy | API JSON pública | remoto + uma consulta por cidade de `SEARCH_CITIES` (ou o estado) |
+| InfoJobs | HTML (URLs de busca) | home office + uma página por cidade de `SEARCH_CITIES` (ou o estado) |
+| Vagas.com.br | HTML (URLs de busca) | 100% home office + estado (o site não filtra por cidade) |
+
+Nos dois HTML, a descrição completa vem do JSON-LD `JobPosting` da página da
+vaga, buscada só para vagas que podem passar no filtro de local (presenciais
+da região primeiro, depois remotas; no máximo 20 por rodada). Sem
+`SEARCH_CITIES`, a busca por estado só traz a primeira página, dominada pela
+capital, e as vagas de cidades pequenas quase nunca aparecem.
+
+As palavras-chave casam como palavra inteira e respeitam acento: escreva
+"Escritório", não "Escritorio".
+
+Avaliados e deixados de fora: Catho (lista em HTML, mas vários recursos para
+o candidato são pagos), Sólides (SPA sem HTML útil), BNE, Trabalha Brasil,
+Empregos.com.br e Indeed (bloqueiam com 403), Jooble e Adzuna (exigem chave de
+API; o Adzuna cobre o Brasil e é um candidato se as fontes atuais ficarem
+curtas). Arbeitnow e Remotive foram desligados em 2026-10: em três meses o
+Arbeitnow trouxe ~10,8 mil vagas e 13 aprovadas, todas presenciais na Alemanha
+ou Werkstudent; o Remotive nunca aprovou nenhuma.
 
 Ficam de fora por decisão de projeto: RemoteOK e Wellfound cobram do candidato;
 Indeed está atrás de Cloudflare e proíbe scraping automatizado nos termos;

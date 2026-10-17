@@ -34,6 +34,9 @@ _SENIOR_PATTERNS = [
     r"\bdiretor(a)?\b",      # diretor/diretora (PT)
     r"\barquitet[oa]\b",     # arquiteto de software
     r"\barchitect\b",
+    r"\bcoordenador(a)?\b",   # cargos de gestão, comuns em administração
+    r"\bgerente\b",
+    r"\bsupervisor(a)?\b",
 ]
 
 _PLENO_PATTERNS = [

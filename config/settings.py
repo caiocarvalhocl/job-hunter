@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     search_keywords: str = "Java,Spring Boot,Backend Developer"
     search_location: str = "Brasil"
     search_remote_only: bool = True
+    # Estado usado na busca presencial/híbrida regional (Gupy, Vagas.com.br,
+    # InfoJobs). O pipeline ainda restringe às cidades de LOCAL_REGION_CITIES.
+    search_state: str = "Paraná"
+    # Cidades buscadas uma a uma no lugar do estado inteiro (Gupy e InfoJobs).
+    # A busca por estado só traz a primeira página, dominada pelas capitais,
+    # então vagas presenciais de cidades pequenas quase nunca aparecem nela.
+    # Vazio = busca por estado. Ex.: "Pato Branco,Francisco Beltrão".
+    search_cities: str = ""
     accept_pleno: bool = False
     # Onsite/hybrid postings are still accepted when located in these cities
     # (sudoeste do Paraná, em torno de Dois Vizinhos). Comma-separated,
@@ -52,6 +60,10 @@ class Settings(BaseSettings):
     @property
     def keywords_list(self) -> List[str]:
         return [k.strip() for k in self.search_keywords.split(",")]
+
+    @property
+    def search_cities_list(self) -> List[str]:
+        return [c.strip() for c in self.search_cities.split(",") if c.strip()]
 
     @property
     def local_cities_list(self) -> List[str]:

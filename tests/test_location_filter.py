@@ -24,6 +24,24 @@ def test_restricted_locations_are_excluded(location):
     assert not is_brazil_eligible(_job(location=location))
 
 
+@pytest.mark.parametrize("location", [
+    "Bulgaria,  Germany,  Ireland, Netherlands",
+    "Argentina, Chile, Colombia",
+    "Portugal / Spain",
+])
+def test_foreign_country_lists_are_excluded(location):
+    assert not is_brazil_eligible(_job(location=location))
+
+
+@pytest.mark.parametrize("location", [
+    "Argentina, Brazil, Chile",
+    "Pato Branco, PR",
+    "Hamburg, Germany",
+])
+def test_country_lists_with_brazil_or_non_country_entries_pass(location):
+    assert is_brazil_eligible(_job(location=location))
+
+
 def test_description_restriction_is_caught():
     # "Remote" alone says nothing about eligibility, so the description
     # restriction applies.

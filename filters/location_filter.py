@@ -53,6 +53,38 @@ _ALLOW_LOCATION_RE = re.compile(
 )
 
 
+# Countries other than Brazil, for Jobicy-style location lists ("Bulgaria,
+# Germany, Ireland, Netherlands"): the job is remote only from those countries.
+_FOREIGN_COUNTRIES = {
+    "usa", "us", "united states", "canada", "mexico", "argentina", "chile",
+    "colombia", "peru", "uruguay", "paraguay", "bolivia", "ecuador", "venezuela",
+    "costa rica", "guatemala", "panama", "dominican republic", "puerto rico",
+    "uk", "united kingdom", "ireland", "germany", "france", "spain", "portugal",
+    "italy", "netherlands", "belgium", "luxembourg", "switzerland", "austria",
+    "poland", "czechia", "czech republic", "slovakia", "hungary", "romania",
+    "bulgaria", "greece", "croatia", "serbia", "slovenia", "bosnia and herzegovina",
+    "north macedonia", "albania", "montenegro", "moldova", "ukraine", "belarus",
+    "lithuania", "latvia", "estonia", "finland", "sweden", "norway", "denmark",
+    "iceland", "cyprus", "malta", "turkey", "georgia", "armenia", "israel",
+    "united arab emirates", "uae", "saudi arabia", "qatar", "egypt", "morocco",
+    "nigeria", "kenya", "south africa", "india", "pakistan", "bangladesh",
+    "sri lanka", "philippines", "vietnam", "thailand", "malaysia", "singapore",
+    "indonesia", "china", "hong kong", "taiwan", "japan", "south korea",
+    "australia", "new zealand",
+}
+
+
+def _is_foreign_country_list(location: str) -> bool:
+    """True when every entry of the location is a country other than Brazil.
+
+    A city, region or anything unrecognised keeps the job, so Brazilian
+    locations like "Pato Branco, PR" are never caught.
+    """
+    parts = [_strip_accents(p).strip().lower() for p in re.split(r"[,;/|]", location)]
+    parts = [p for p in parts if p]
+    return bool(parts) and all(p in _FOREIGN_COUNTRIES for p in parts)
+
+
 def is_brazil_eligible(job: RawJob) -> bool:
     """True if nothing indicates the posting excludes Brazil-based candidates."""
     location = (job.location or "").strip()
@@ -62,6 +94,9 @@ def is_brazil_eligible(job: RawJob) -> bool:
 
     if location and _ALLOW_LOCATION_RE.search(location):
         return True
+
+    if location and _is_foreign_country_list(location):
+        return False
 
     # No conclusive location field: check description for hard restrictions.
     description = (job.description or "")[:4000]

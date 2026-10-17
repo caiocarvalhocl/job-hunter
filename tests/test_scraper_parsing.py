@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from filters.seniority_filter import detect_level
 from scrapers.gupy import GupyScraper
 from scrapers.programathor import ProgramathorScraper
 from utils import is_international_keyword
@@ -107,12 +108,12 @@ PROGRAMATHOR_HTML = """
 """
 
 
-def test_programathor_parses_job_anchors_only(monkeypatch):
+def _scrape_programathor(monkeypatch, html):
     import scrapers.programathor as pt_mod
 
     class _FakeResp:
         status = 200
-        async def text(self): return PROGRAMATHOR_HTML
+        async def text(self): return html
         async def __aenter__(self): return self
         async def __aexit__(self, *a): return False
 
@@ -122,9 +123,11 @@ def test_programathor_parses_job_anchors_only(monkeypatch):
         async def __aexit__(self, *a): return False
 
     monkeypatch.setattr(pt_mod.aiohttp, "ClientSession", lambda: _FakeSession())
+    return asyncio.run(ProgramathorScraper(keywords=["Java"]).scrape())
 
-    scraper = ProgramathorScraper(keywords=["Java"])
-    jobs = asyncio.run(scraper.scrape())
+
+def test_programathor_parses_job_anchors_only(monkeypatch):
+    jobs = _scrape_programathor(monkeypatch, PROGRAMATHOR_HTML)
 
     assert len(jobs) == 2
     by_url = {j.url: j for j in jobs}
@@ -133,6 +136,27 @@ def test_programathor_parses_job_anchors_only(monkeypatch):
     assert onsite.title == "Desenvolvedor Java Júnior"
     assert onsite.is_remote is False and "Rio de Janeiro" in onsite.location
     assert remote.is_remote is True and remote.location == "Remoto"
+
+
+# Real card markup (2026-10): status badges are <span>s inside the <h3>.
+PROGRAMATHOR_BADGES_HTML = """
+<div class="cell-list"><a href="/jobs/9001-ai-engineer-pleno"><div class="cell-list-content">
+  <h3 class="text-24">AI Engineer Pleno<span class="new-label">NOVA</span></h3>
+  <div><span>Askable</span><span>Remoto</span></div></div></a></div>
+<div class="cell-list"><a href="/jobs/9002-dev-back-end-pleno"><div class="cell-list-content">
+  <h3 class="color-gray text-24"><span class="color-red">Vencida</span> Desenvolvedor(a) Back-End Pleno</h3>
+  <div><span>Crescer RH</span><span>Remoto</span></div></div></a></div>
+<div class="cell-list"><a href="/jobs/9003-tecnico-de-desenvolvimento"><div class="cell-list-content">
+  <h3 class="text-24"><span class="presential-only-badge">📍 PRESENCIAL - SOMENTE PARA CANDIDATOS NO LOCAL</span> Técnico de Desenvolvimento Júnior</h3>
+  <div><span>HunterCo</span><span>Joinville  (Presencial)</span></div></div></a></div>
+"""
+
+
+def test_programathor_strips_badges_and_skips_expired(monkeypatch):
+    jobs = _scrape_programathor(monkeypatch, PROGRAMATHOR_BADGES_HTML)
+
+    assert [j.title for j in jobs] == ["AI Engineer Pleno", "Técnico de Desenvolvimento Júnior"]
+    assert detect_level(jobs[0].title) == "pleno"
 
 
 def test_programathor_maps_only_known_tech_slugs():
