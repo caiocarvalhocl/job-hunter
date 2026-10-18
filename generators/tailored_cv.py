@@ -133,11 +133,11 @@ def _validate_and_resolve(plan: dict, profile: dict, lang: str) -> dict:
     grouped = [(label, chosen) for _, label, chosen in grouped]
 
     # Experience: resolve bullet ids -> verbatim text, keep every company.
-    exp_plan = {e["company"]: e.get("bullet_ids", []) for e in plan.get("experience", [])}
+    exp_plan = [bid for e in plan.get("experience", []) for bid in e.get("bullet_ids", [])]
     experience = []
     for e in profile["experience"]:
         bullets_by_id = {b["id"]: b[lang] for b in e["bullets"]}
-        wanted = [bid for bid in exp_plan.get(e["company"], []) if bid in bullets_by_id]
+        wanted = [bid for bid in exp_plan if bid in bullets_by_id]
         if not wanted:  # fallback: keep all real bullets rather than an empty job
             wanted = list(bullets_by_id.keys())
         org = e["org_note"][lang]
